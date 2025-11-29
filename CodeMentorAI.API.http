@@ -1,0 +1,6 @@
+@CodeMentorAI.API_HostAddress = http://localhost:5030
+
+GET {{CodeMentorAI.API_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
