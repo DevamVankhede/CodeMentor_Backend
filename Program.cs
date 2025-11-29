@@ -125,13 +125,24 @@ app.MapGet("/health", () => new {
 }).WithName("HealthCheck");
 
 // Start the application
-var port = app.Environment.IsDevelopment() ? "7000" : "5000";
-app.Urls.Add($"https://localhost:{port}");
-app.Urls.Add($"http://localhost:{(app.Environment.IsDevelopment() ? "5000" : "8080")}");
+if (app.Environment.IsDevelopment())
+{
+    // Development: Use both HTTP and HTTPS
+    app.Urls.Add("https://localhost:7000");
+    app.Urls.Add("http://localhost:5000");
+    Console.WriteLine("🚀 CodeMentor AI Backend Starting (Development)...");
+    Console.WriteLine("🌐 HTTPS: https://localhost:7000");
+    Console.WriteLine("🌐 HTTP: http://localhost:5000");
+}
+else
+{
+    // Production: Only HTTP (cloud platforms handle HTTPS termination)
+    var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
+    app.Urls.Add($"http://0.0.0.0:{port}");
+    Console.WriteLine("🚀 CodeMentor AI Backend Starting (Production)...");
+    Console.WriteLine($"🌐 HTTP: http://0.0.0.0:{port}");
+}
 
-Console.WriteLine("🚀 CodeMentor AI Backend Starting...");
-Console.WriteLine($"🌐 HTTPS: https://localhost:{port}");
-Console.WriteLine($"🌐 HTTP: http://localhost:{(app.Environment.IsDevelopment() ? "5000" : "8080")}");
 Console.WriteLine("✨ Ready for connections!");
 
 app.Run();
