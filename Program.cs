@@ -125,19 +125,28 @@ app.MapGet("/health", () => new {
 }).WithName("HealthCheck");
 
 // Start the application
-if (app.Environment.IsDevelopment())
+var port = Environment.GetEnvironmentVariable("PORT");
+if (string.IsNullOrEmpty(port))
 {
-    // Development: Use both HTTP and HTTPS
-    app.Urls.Add("https://localhost:7000");
-    app.Urls.Add("http://localhost:5000");
-    Console.WriteLine("🚀 CodeMentor AI Backend Starting (Development)...");
-    Console.WriteLine("🌐 HTTPS: https://localhost:7000");
-    Console.WriteLine("🌐 HTTP: http://localhost:5000");
+    // Development or local: Use default ports
+    if (app.Environment.IsDevelopment())
+    {
+        app.Urls.Add("https://localhost:7000");
+        app.Urls.Add("http://localhost:5000");
+        Console.WriteLine("🚀 CodeMentor AI Backend Starting (Development)...");
+        Console.WriteLine("🌐 HTTPS: https://localhost:7000");
+        Console.WriteLine("🌐 HTTP: http://localhost:5000");
+    }
+    else
+    {
+        app.Urls.Add("http://0.0.0.0:8080");
+        Console.WriteLine("🚀 CodeMentor AI Backend Starting (Production - Default Port)...");
+        Console.WriteLine("🌐 HTTP: http://0.0.0.0:8080");
+    }
 }
 else
 {
-    // Production: Only HTTP (cloud platforms handle HTTPS termination)
-    var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
+    // Production on Render/Cloud: Use PORT from environment
     app.Urls.Add($"http://0.0.0.0:{port}");
     Console.WriteLine("🚀 CodeMentor AI Backend Starting (Production)...");
     Console.WriteLine($"🌐 HTTP: http://0.0.0.0:{port}");

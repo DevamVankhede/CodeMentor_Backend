@@ -28,7 +28,6 @@ WORKDIR /app
 COPY --from=build /app/publish .
 
 # Set environment variables
-ENV ASPNETCORE_URLS=http://+:80
 ENV ASPNETCORE_ENVIRONMENT=Production
 ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1
 
@@ -36,6 +35,7 @@ ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1
 RUN useradd -m -u 1000 appuser && chown -R appuser /app
 USER appuser
 
-EXPOSE 80
+# Expose port (will be set by Render via PORT env var)
+EXPOSE 8080
 
 ENTRYPOINT ["dotnet", "CodeMentorAI.API.dll"]
