@@ -8,6 +8,21 @@ using CodeMentorAI.API.Hubs;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Configure port binding early - Render requires this
+var port = Environment.GetEnvironmentVariable("PORT");
+if (!string.IsNullOrEmpty(port))
+{
+    // Render/Cloud: Use PORT from environment
+    builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
+    Console.WriteLine($"🔧 Configuring port binding: http://0.0.0.0:{port}");
+}
+else if (!builder.Environment.IsDevelopment())
+{
+    // Production without PORT: Use default
+    builder.WebHost.UseUrls("http://0.0.0.0:8080");
+    Console.WriteLine("🔧 Configuring port binding: http://0.0.0.0:8080");
+}
+
 // Add services to the container
 builder.Services.AddControllers();
 builder.Services.AddSignalR();
@@ -79,14 +94,15 @@ var app = builder.Build();
 
 // Configure the HTTP request pipeline
 
-// Ensure database is created and seeded
-using (var scope = app.Services.CreateScope())
+// Ensure database is created and seeded (non-blocking for startup)
+_ = Task.Run(async () =>
 {
-    var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
-    
     try
     {
+        using var scope = app.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+        
         await context.Database.EnsureCreatedAsync();
         logger.LogInformation("✅ Database created successfully");
         
@@ -95,9 +111,10 @@ using (var scope = app.Services.CreateScope())
     }
     catch (Exception ex)
     {
+        var logger = app.Services.GetRequiredService<ILogger<Program>>();
         logger.LogError(ex, "❌ Error occurred while creating/seeding the database");
     }
-}
+});
 
 // Middleware pipeline
 app.UseCors("AllowAll");
@@ -124,32 +141,16 @@ app.MapGet("/health", () => new {
     }
 }).WithName("HealthCheck");
 
-// Start the application
-var port = Environment.GetEnvironmentVariable("PORT");
-if (string.IsNullOrEmpty(port))
+// Log startup info
+if (app.Environment.IsDevelopment())
 {
-    // Development or local: Use default ports
-    if (app.Environment.IsDevelopment())
-    {
-        app.Urls.Add("https://localhost:7000");
-        app.Urls.Add("http://localhost:5000");
-        Console.WriteLine("🚀 CodeMentor AI Backend Starting (Development)...");
-        Console.WriteLine("🌐 HTTPS: https://localhost:7000");
-        Console.WriteLine("🌐 HTTP: http://localhost:5000");
-    }
-    else
-    {
-        app.Urls.Add("http://0.0.0.0:8080");
-        Console.WriteLine("🚀 CodeMentor AI Backend Starting (Production - Default Port)...");
-        Console.WriteLine("🌐 HTTP: http://0.0.0.0:8080");
-    }
+    Console.WriteLine("🚀 CodeMentor AI Backend Starting (Development)...");
 }
 else
 {
-    // Production on Render/Cloud: Use PORT from environment
-    app.Urls.Add($"http://0.0.0.0:{port}");
-    Console.WriteLine("🚀 CodeMentor AI Backend Starting (Production)...");
-    Console.WriteLine($"🌐 HTTP: http://0.0.0.0:{port}");
+    var configuredPort = port ?? "8080";
+    Console.WriteLine($"🚀 CodeMentor AI Backend Starting (Production)...");
+    Console.WriteLine($"🌐 Listening on: http://0.0.0.0:{configuredPort}");
 }
 
 Console.WriteLine("✨ Ready for connections!");
