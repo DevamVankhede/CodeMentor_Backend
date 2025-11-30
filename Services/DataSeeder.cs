@@ -8,7 +8,7 @@ public static class DataSeeder
 {
     public static async Task SeedAsync(AppDbContext context)
     {
-        // Check if data already exists
+        // Check if data already exists - only seed if database is empty
         if (context.Users.Any())
         {
             return; // Database has been seeded
@@ -72,119 +72,210 @@ public static class DataSeeder
         context.Achievements.AddRange(achievements);
         await context.SaveChangesAsync();
 
-        // Seed Demo Users
-        var users = new[]
+        var random = new Random();
+        var users = new List<User>();
+        var profiles = new List<UserProfile>();
+
+        // Seed 2 Admin Users
+        var adminUsers = new[]
         {
             new User
             {
-                Name = "Admin User",
+                Name = "Super Admin",
                 Email = "admin@codementor.ai",
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword("admin123"),
                 IsEmailVerified = true,
                 IsAdmin = true,
-                CreatedAt = DateTime.UtcNow.AddDays(-30),
+                CreatedAt = DateTime.UtcNow.AddDays(-60),
                 UpdatedAt = DateTime.UtcNow,
-                LastLoginAt = DateTime.UtcNow
+                LastLoginAt = DateTime.UtcNow.AddHours(-1)
             },
             new User
             {
-                Name = "Alex CodeMaster",
-                Email = "alex@codementor.ai",
-                PasswordHash = BCrypt.Net.BCrypt.HashPassword("alex123"),
+                Name = "Admin Manager",
+                Email = "admin2@codementor.ai",
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword("admin123"),
                 IsEmailVerified = true,
-                CreatedAt = DateTime.UtcNow.AddDays(-20),
-                UpdatedAt = DateTime.UtcNow
-            },
-            new User
-            {
-                Name = "Sarah DevQueen",
-                Email = "sarah@codementor.ai",
-                PasswordHash = BCrypt.Net.BCrypt.HashPassword("sarah123"),
-                IsEmailVerified = true,
-                CreatedAt = DateTime.UtcNow.AddDays(-15),
-                UpdatedAt = DateTime.UtcNow
+                IsAdmin = true,
+                CreatedAt = DateTime.UtcNow.AddDays(-45),
+                UpdatedAt = DateTime.UtcNow,
+                LastLoginAt = DateTime.UtcNow.AddHours(-2)
             }
         };
 
-        context.Users.AddRange(users);
+        users.AddRange(adminUsers);
+        context.Users.AddRange(adminUsers);
         await context.SaveChangesAsync();
 
-        // Seed User Profiles
-        var profiles = new[]
+        // Create profiles for admin users
+        profiles.Add(new UserProfile
         {
-            new UserProfile
-            {
-                UserId = users[0].Id,
-                Level = 15,
-                XpPoints = 2847,
-                BugsFixed = 127,
-                GamesWon = 43,
-                CurrentStreak = 7,
-                PreferredLanguages = JsonSerializer.Serialize(new[] { "JavaScript", "Python", "TypeScript" }),
-                LearningGoals = "Master full-stack development and AI integration",
-                LastActiveDate = DateTime.UtcNow
-            },
-            new UserProfile
-            {
-                UserId = users[1].Id,
-                Level = 22,
-                XpPoints = 4521,
-                BugsFixed = 203,
-                GamesWon = 78,
-                CurrentStreak = 12,
-                PreferredLanguages = JsonSerializer.Serialize(new[] { "JavaScript", "React", "Node.js" }),
-                LearningGoals = "Become a senior full-stack developer",
-                LastActiveDate = DateTime.UtcNow.AddHours(-2)
-            },
-            new UserProfile
-            {
-                UserId = users[2].Id,
-                Level = 18,
-                XpPoints = 3256,
-                BugsFixed = 156,
-                GamesWon = 62,
-                CurrentStreak = 5,
-                PreferredLanguages = JsonSerializer.Serialize(new[] { "Python", "Django", "PostgreSQL" }),
-                LearningGoals = "Specialize in backend development and databases",
-                LastActiveDate = DateTime.UtcNow.AddHours(-1)
-            }
-        };
+            UserId = adminUsers[0].Id,
+            Level = 25,
+            XpPoints = 5000,
+            BugsFixed = 250,
+            GamesWon = 100,
+            CurrentStreak = 15,
+            PreferredLanguages = JsonSerializer.Serialize(new[] { "JavaScript", "Python", "TypeScript", "C#" }),
+            LearningGoals = "Manage platform and help developers grow",
+            LastActiveDate = DateTime.UtcNow.AddHours(-1)
+        });
 
+        profiles.Add(new UserProfile
+        {
+            UserId = adminUsers[1].Id,
+            Level = 20,
+            XpPoints = 4000,
+            BugsFixed = 180,
+            GamesWon = 75,
+            CurrentStreak = 10,
+            PreferredLanguages = JsonSerializer.Serialize(new[] { "JavaScript", "React", "Node.js" }),
+            LearningGoals = "Platform administration and user support",
+            LastActiveDate = DateTime.UtcNow.AddHours(-2)
+        });
+
+        // Seed 1000 Dummy Users
+        var firstNames = new[] { "Alex", "Jordan", "Taylor", "Morgan", "Casey", "Riley", "Avery", "Quinn", "Sage", "River", "Skyler", "Phoenix", "Blake", "Cameron", "Dakota", "Emery", "Finley", "Harper", "Hayden", "Kai" };
+        var lastNames = new[] { "Smith", "Johnson", "Williams", "Brown", "Jones", "Garcia", "Miller", "Davis", "Rodriguez", "Martinez", "Hernandez", "Lopez", "Wilson", "Anderson", "Thomas", "Taylor", "Moore", "Jackson", "Martin", "Lee" };
+        var domains = new[] { "gmail.com", "yahoo.com", "outlook.com", "hotmail.com", "example.com", "test.com", "dev.com", "code.com" };
+        var languages = new[] { "JavaScript", "Python", "Java", "TypeScript", "C#", "C++", "Go", "Rust", "Ruby", "PHP" };
+
+        for (int i = 0; i < 1000; i++)
+        {
+            var firstName = firstNames[random.Next(firstNames.Length)];
+            var lastName = lastNames[random.Next(lastNames.Length)];
+            var domain = domains[random.Next(domains.Length)];
+            var email = $"{firstName.ToLower()}.{lastName.ToLower()}.{i}@{domain}";
+            var name = $"{firstName} {lastName}";
+            var createdAt = DateTime.UtcNow.AddDays(-random.Next(1, 365));
+            var lastLogin = random.Next(100) < 70 ? DateTime.UtcNow.AddHours(-random.Next(1, 720)) : (DateTime?)null;
+
+            var user = new User
+            {
+                Name = name,
+                Email = email,
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword("password123"),
+                IsEmailVerified = random.Next(100) < 90, // 90% verified
+                IsAdmin = false,
+                CreatedAt = createdAt,
+                UpdatedAt = createdAt.AddDays(random.Next(1, 30)),
+                LastLoginAt = lastLogin
+            };
+
+            users.Add(user);
+            context.Users.Add(user);
+
+            // Batch save every 100 users for performance
+            if ((i + 1) % 100 == 0)
+            {
+                await context.SaveChangesAsync();
+            }
+
+            // Create profile for this user
+            var userLevel = random.Next(1, 30);
+            var xpPoints = userLevel * 100 + random.Next(0, 100);
+            var bugsFixed = random.Next(0, 200);
+            var gamesWon = random.Next(0, 100);
+            var streak = random.Next(0, 30);
+            var selectedLanguages = languages.OrderBy(x => random.Next()).Take(random.Next(2, 5)).ToArray();
+
+            profiles.Add(new UserProfile
+            {
+                UserId = user.Id,
+                Level = userLevel,
+                XpPoints = xpPoints,
+                BugsFixed = bugsFixed,
+                GamesWon = gamesWon,
+                CurrentStreak = streak,
+                PreferredLanguages = JsonSerializer.Serialize(selectedLanguages),
+                LearningGoals = $"Master {selectedLanguages[0]} and become a better developer",
+                LastActiveDate = lastLogin ?? createdAt
+            });
+        }
+
+        // Final save for remaining users
+        await context.SaveChangesAsync();
+
+        // Save all profiles
         context.UserProfiles.AddRange(profiles);
         await context.SaveChangesAsync();
 
-        // Seed Code Snippets
-        var codeSnippets = new[]
+        // Seed some Game Results for variety
+        var gameTypes = new[] { "bug-hunt", "code-completion", "refactor-challenge", "speed-coding" };
+        var difficulties = new[] { "easy", "medium", "hard" };
+
+        var gameResults = new List<GameResult>();
+        var selectedUsers = users.Where(u => !u.IsAdmin).OrderBy(x => random.Next()).Take(500).ToList();
+
+        foreach (var user in selectedUsers)
         {
-            new CodeSnippet
+            var numGames = random.Next(1, 10);
+            for (int i = 0; i < numGames; i++)
             {
-                Title = "React Component Example",
-                Code = "import React from 'react';\n\nconst MyComponent = () => {\n  return (\n    <div>\n      <h1>Hello World</h1>\n    </div>\n  );\n};\n\nexport default MyComponent;",
-                Language = "javascript",
-                Description = "A simple React functional component",
-                IsPublic = true,
-                UserId = users[0].Id,
-                Tags = JsonSerializer.Serialize(new[] { "react", "component", "frontend" }),
-                ViewCount = 45,
-                CreatedAt = DateTime.UtcNow.AddDays(-5),
-                UpdatedAt = DateTime.UtcNow.AddDays(-5)
-            },
-            new CodeSnippet
-            {
-                Title = "Python Data Processing",
-                Code = "import pandas as pd\nimport numpy as np\n\ndef process_data(df):\n    # Clean and process data\n    df_clean = df.dropna()\n    df_clean['processed'] = df_clean['value'] * 2\n    return df_clean\n\n# Usage\ndata = pd.DataFrame({'value': [1, 2, 3, None, 5]})\nresult = process_data(data)\nprint(result)",
-                Language = "python",
-                Description = "Data processing with pandas",
-                IsPublic = true,
-                UserId = users[1].Id,
-                Tags = JsonSerializer.Serialize(new[] { "python", "pandas", "data-science" }),
-                ViewCount = 32,
-                CreatedAt = DateTime.UtcNow.AddDays(-3),
-                UpdatedAt = DateTime.UtcNow.AddDays(-3)
+                gameResults.Add(new GameResult
+                {
+                    UserId = user.Id,
+                    GameType = gameTypes[random.Next(gameTypes.Length)],
+                    Difficulty = difficulties[random.Next(difficulties.Length)],
+                    Score = random.Next(50, 100),
+                    TimeSpent = random.Next(60, 600), // 1-10 minutes
+                    CompletedAt = DateTime.UtcNow.AddDays(-random.Next(0, 90)),
+                    Details = JsonSerializer.Serialize(new { language = languages[random.Next(languages.Length)] })
+                });
             }
-        };
+        }
+
+        context.GameResults.AddRange(gameResults);
+        await context.SaveChangesAsync();
+
+        // Seed some Code Snippets
+        var codeSnippets = new List<CodeSnippet>();
+        var snippetUsers = users.Where(u => !u.IsAdmin).OrderBy(x => random.Next()).Take(200).ToList();
+
+        foreach (var user in snippetUsers)
+        {
+            var numSnippets = random.Next(1, 5);
+            for (int i = 0; i < numSnippets; i++)
+            {
+                var language = languages[random.Next(languages.Length)];
+                codeSnippets.Add(new CodeSnippet
+                {
+                    Title = $"{language} Code Example {i + 1}",
+                    Code = $"// {language} code example\nfunction example() {{\n  return 'Hello World';\n}}",
+                    Language = language.ToLower(),
+                    Description = $"A sample {language} code snippet",
+                    IsPublic = random.Next(100) < 70, // 70% public
+                    UserId = user.Id,
+                    Tags = JsonSerializer.Serialize(new[] { language.ToLower(), "example", "sample" }),
+                    ViewCount = random.Next(0, 1000),
+                    CreatedAt = DateTime.UtcNow.AddDays(-random.Next(0, 180)),
+                    UpdatedAt = DateTime.UtcNow.AddDays(-random.Next(0, 30))
+                });
+            }
+        }
 
         context.CodeSnippets.AddRange(codeSnippets);
+        await context.SaveChangesAsync();
+
+        // Seed some Collaboration Sessions
+        var sessions = new List<CollaborationSession>();
+        var sessionOwners = users.Where(u => !u.IsAdmin).OrderBy(x => random.Next()).Take(50).ToList();
+
+        foreach (var owner in sessionOwners)
+        {
+            sessions.Add(new CollaborationSession
+            {
+                OwnerId = owner.Id,
+                RoomId = Guid.NewGuid().ToString(),
+                Title = $"Collaboration Session {sessions.Count + 1}",
+                Language = languages[random.Next(languages.Length)].ToLower(),
+                IsActive = random.Next(100) < 30, // 30% active
+                CreatedAt = DateTime.UtcNow.AddDays(-random.Next(0, 30)),
+                UpdatedAt = DateTime.UtcNow.AddHours(-random.Next(0, 24))
+            });
+        }
+
+        context.CollaborationSessions.AddRange(sessions);
         await context.SaveChangesAsync();
     }
 }
