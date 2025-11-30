@@ -267,9 +267,13 @@ public static class DataSeeder
             {
                 OwnerId = owner.Id,
                 RoomId = Guid.NewGuid().ToString(),
-                Title = $"Collaboration Session {sessions.Count + 1}",
+                Name = $"Collaboration Session {sessions.Count + 1}",
+                Description = $"A collaborative coding session for {languages[random.Next(languages.Length)]}",
                 Language = languages[random.Next(languages.Length)].ToLower(),
+                Code = $"// Welcome to collaboration session\nfunction hello() {{\n  console.log('Hello from {owner.Name}');\n}}",
                 IsActive = random.Next(100) < 30, // 30% active
+                IsPublic = random.Next(100) < 50, // 50% public
+                Status = "active",
                 CreatedAt = DateTime.UtcNow.AddDays(-random.Next(0, 30)),
                 UpdatedAt = DateTime.UtcNow.AddHours(-random.Next(0, 24))
             });
