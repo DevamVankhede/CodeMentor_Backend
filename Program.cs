@@ -5,6 +5,7 @@ using System.Text;
 using CodeMentorAI.API.Data;
 using CodeMentorAI.API.Services;
 using CodeMentorAI.API.Hubs;
+using System.IO;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -36,12 +37,35 @@ builder.Services.AddHttpClient<IAIService, GoogleAIService>(client =>
 builder.Services.AddScoped<IAIService, GoogleAIService>();
 
 // Database configuration
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") 
-    ?? "Data Source=codementor_ai.db";
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+if (string.IsNullOrWhiteSpace(connectionString))
+{
+    connectionString = "Data Source=codementor_ai.db";
+}
+
+var configuredProvider = builder.Configuration["Database:Provider"];
+var databaseProvider = DetectDatabaseProvider(configuredProvider, connectionString);
+
+// Ensure SQLite paths are always absolute so data stays on disk across restarts
+if (databaseProvider == "sqlite")
+{
+    connectionString = NormalizeSqliteConnectionString(connectionString, builder.Environment.ContentRootPath);
+}
 
 builder.Services.AddDbContext<AppDbContext>(options =>
 {
-    options.UseSqlite(connectionString);
+    if (databaseProvider == "postgres")
+    {
+        options.UseNpgsql(connectionString, sqlOptions =>
+        {
+            sqlOptions.MigrationsAssembly(typeof(AppDbContext).Assembly.FullName);
+        });
+    }
+    else
+    {
+        options.UseSqlite(connectionString);
+    }
+
     options.EnableSensitiveDataLogging(builder.Environment.IsDevelopment());
 });
 
@@ -94,7 +118,7 @@ var app = builder.Build();
 
 // Configure the HTTP request pipeline
 
-// Ensure database is created and seeded (non-blocking for startup)
+// Ensure database is created/migrated and seeded (non-blocking for startup)
 _ = Task.Run(async () =>
 {
     try
@@ -103,11 +127,10 @@ _ = Task.Run(async () =>
         var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
         
-        await context.Database.EnsureCreatedAsync();
-        logger.LogInformation("✅ Database created successfully");
+        await context.Database.MigrateAsync();
+        logger.LogInformation("✅ Database migrations applied successfully");
         
-        await CodeMentorAI.API.Services.DataSeeder.SeedAsync(context);
-        logger.LogInformation("✅ Database seeded successfully");
+        await CodeMentorAI.API.Services.DataSeeder.SeedAsync(context, logger);
     }
     catch (Exception ex)
     {
@@ -145,6 +168,8 @@ app.MapGet("/health", () => new {
 if (app.Environment.IsDevelopment())
 {
     Console.WriteLine("🚀 CodeMentor AI Backend Starting (Development)...");
+    Console.WriteLine($"🗄️  Database provider: {databaseProvider}");
+    Console.WriteLine($"📁 Connection string: {connectionString}");
 }
 else
 {
@@ -156,3 +181,44 @@ else
 Console.WriteLine("✨ Ready for connections!");
 
 app.Run();
+
+static string DetectDatabaseProvider(string? configuredProvider, string connectionString)
+{
+    if (!string.IsNullOrWhiteSpace(configuredProvider))
+    {
+        return configuredProvider.Trim().ToLowerInvariant();
+    }
+
+    if (connectionString.Contains("Host=", StringComparison.OrdinalIgnoreCase) ||
+        connectionString.StartsWith("postgres", StringComparison.OrdinalIgnoreCase) ||
+        connectionString.Contains("Username=", StringComparison.OrdinalIgnoreCase))
+    {
+        return "postgres";
+    }
+
+    return "sqlite";
+}
+
+static string NormalizeSqliteConnectionString(string connectionString, string contentRoot)
+{
+    const string dataSourcePrefix = "Data Source=";
+    if (!connectionString.StartsWith(dataSourcePrefix, StringComparison.OrdinalIgnoreCase))
+    {
+        return connectionString;
+    }
+
+    var dataSource = connectionString.Substring(dataSourcePrefix.Length).Trim().Trim('"');
+    if (Path.IsPathRooted(dataSource))
+    {
+        return connectionString;
+    }
+
+    var absolutePath = Path.Combine(contentRoot, dataSource);
+    var directory = Path.GetDirectoryName(absolutePath);
+    if (!string.IsNullOrEmpty(directory))
+    {
+        Directory.CreateDirectory(directory);
+    }
+
+    return $"{dataSourcePrefix}{absolutePath}";
+}

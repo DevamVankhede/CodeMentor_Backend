@@ -1,18 +1,39 @@
 using CodeMentorAI.API.Data;
 using CodeMentorAI.API.Models;
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
 
 namespace CodeMentorAI.API.Services;
 
 public static class DataSeeder
 {
-    public static async Task SeedAsync(AppDbContext context)
+    public static async Task SeedAsync(AppDbContext context, ILogger? logger = null)
     {
         // Check if data already exists - only seed if database is empty
         if (context.Users.Any())
         {
+            logger?.LogInformation("Database already contains data, skipping seed");
             return; // Database has been seeded
         }
+
+        // Check if seeding is disabled via environment variable
+        var skipSeeding = Environment.GetEnvironmentVariable("SKIP_SEEDING")?.ToLower() == "true";
+        if (skipSeeding)
+        {
+            logger?.LogInformation("Seeding disabled via SKIP_SEEDING environment variable");
+            return;
+        }
+
+        // Determine seed size based on environment
+        var isProduction = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") == "Production";
+        var seedUserCount = isProduction ? 10 : 300; // keep dev seeds lighter for faster startup
+        var customSeedCount = Environment.GetEnvironmentVariable("SEED_USER_COUNT");
+        if (!string.IsNullOrWhiteSpace(customSeedCount) && int.TryParse(customSeedCount, out var parsedCount) && parsedCount >= 0)
+        {
+            seedUserCount = parsedCount;
+        }
+        
+        logger?.LogInformation($"Starting database seed (User count: {seedUserCount})");
 
         // Seed Achievements
         var achievements = new[]
@@ -134,13 +155,16 @@ public static class DataSeeder
             LastActiveDate = DateTime.UtcNow.AddHours(-2)
         });
 
-        // Seed 1000 Dummy Users
+        // Seed Dummy Users (configurable count)
         var firstNames = new[] { "Alex", "Jordan", "Taylor", "Morgan", "Casey", "Riley", "Avery", "Quinn", "Sage", "River", "Skyler", "Phoenix", "Blake", "Cameron", "Dakota", "Emery", "Finley", "Harper", "Hayden", "Kai" };
         var lastNames = new[] { "Smith", "Johnson", "Williams", "Brown", "Jones", "Garcia", "Miller", "Davis", "Rodriguez", "Martinez", "Hernandez", "Lopez", "Wilson", "Anderson", "Thomas", "Taylor", "Moore", "Jackson", "Martin", "Lee" };
         var domains = new[] { "gmail.com", "yahoo.com", "outlook.com", "hotmail.com", "example.com", "test.com", "dev.com", "code.com" };
         var languages = new[] { "JavaScript", "Python", "Java", "TypeScript", "C#", "C++", "Go", "Rust", "Ruby", "PHP" };
 
-        for (int i = 0; i < 1000; i++)
+        // Pre-hash password once for dummy users (faster seeding)
+        var dummyPasswordHash = BCrypt.Net.BCrypt.HashPassword("password123", workFactor: 4); // Lower work factor for faster seeding
+
+        for (int i = 0; i < seedUserCount; i++)
         {
             var firstName = firstNames[random.Next(firstNames.Length)];
             var lastName = lastNames[random.Next(lastNames.Length)];
@@ -154,7 +178,7 @@ public static class DataSeeder
             {
                 Name = name,
                 Email = email,
-                PasswordHash = BCrypt.Net.BCrypt.HashPassword("password123"),
+                PasswordHash = dummyPasswordHash, // Reuse pre-hashed password for performance
                 IsEmailVerified = random.Next(100) < 90, // 90% verified
                 IsAdmin = false,
                 CreatedAt = createdAt,
@@ -165,10 +189,12 @@ public static class DataSeeder
             users.Add(user);
             context.Users.Add(user);
 
-            // Batch save every 100 users for performance
-            if ((i + 1) % 100 == 0)
+            // Batch save every 50 users for performance (or 10 for small seeds)
+            var batchSize = seedUserCount > 100 ? 100 : 10;
+            if ((i + 1) % batchSize == 0)
             {
                 await context.SaveChangesAsync();
+                logger?.LogInformation($"Seeded {i + 1} users...");
             }
 
             // Create profile for this user
@@ -205,7 +231,8 @@ public static class DataSeeder
         var difficulties = new[] { "easy", "medium", "hard" };
 
         var gameResults = new List<GameResult>();
-        var selectedUsers = users.Where(u => !u.IsAdmin).OrderBy(x => random.Next()).Take(500).ToList();
+        var gameUserCount = Math.Min(seedUserCount / 2, 500); // Scale with seed size
+        var selectedUsers = users.Where(u => !u.IsAdmin).OrderBy(x => random.Next()).Take(gameUserCount).ToList();
 
         foreach (var user in selectedUsers)
         {
@@ -230,7 +257,8 @@ public static class DataSeeder
 
         // Seed some Code Snippets
         var codeSnippets = new List<CodeSnippet>();
-        var snippetUsers = users.Where(u => !u.IsAdmin).OrderBy(x => random.Next()).Take(200).ToList();
+        var snippetUserCount = Math.Min(seedUserCount / 5, 200); // Scale with seed size
+        var snippetUsers = users.Where(u => !u.IsAdmin).OrderBy(x => random.Next()).Take(snippetUserCount).ToList();
 
         foreach (var user in snippetUsers)
         {
@@ -259,7 +287,8 @@ public static class DataSeeder
 
         // Seed some Collaboration Sessions
         var sessions = new List<CollaborationSession>();
-        var sessionOwners = users.Where(u => !u.IsAdmin).OrderBy(x => random.Next()).Take(50).ToList();
+        var sessionOwnerCount = Math.Min(seedUserCount / 20, 50); // Scale with seed size
+        var sessionOwners = users.Where(u => !u.IsAdmin).OrderBy(x => random.Next()).Take(sessionOwnerCount).ToList();
 
         foreach (var owner in sessionOwners)
         {
@@ -281,5 +310,7 @@ public static class DataSeeder
 
         context.CollaborationSessions.AddRange(sessions);
         await context.SaveChangesAsync();
+        
+        logger?.LogInformation($"✅ Database seeding completed: {seedUserCount} users, {gameResults.Count} game results, {codeSnippets.Count} code snippets, {sessions.Count} collaboration sessions");
     }
 }

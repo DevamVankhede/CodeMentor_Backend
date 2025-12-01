@@ -15,7 +15,7 @@
 
 - .NET 8.0
 - Entity Framework Core
-- SQLite (Development) / SQL Server (Production)
+- SQLite (Development) / PostgreSQL (Production)
 - SignalR
 - JWT Authentication
 
@@ -23,7 +23,7 @@
 
 - .NET 8.0 SDK
 - Visual Studio 2022 or VS Code
-- SQL Server (for production) or SQLite (for development)
+- SQLite installed locally (dev) or a managed PostgreSQL instance (production)
 
 ## 🏃 Quick Start
 
@@ -275,3 +275,5 @@ For issues and questions:
 - Open an issue on GitHub
 - Check documentation
 - Contact: support@codementor-ai.com
+
+
